@@ -8,7 +8,7 @@ import torchvision
 # modified from https://github.com/benjiebob/SMALViewer/blob/master/p3d_renderer.py
 from pytorch3d.renderer import (
     look_at_view_transform,
-    FoVOrthographicCameras, 
+    FoVPerspectiveCameras, 
     PointsRasterizationSettings,
     PointsRenderer,
     PointsRasterizer,
@@ -37,8 +37,8 @@ class PointCloudRenderer(nn.Module):
         self.device = device
 
         # Initialize a camera.
-        R, T = look_at_view_transform(20, 10, 0)
-        cameras = FoVOrthographicCameras(device=device, R=R, T=T, znear=0.01)
+        R, T = look_at_view_transform(2.7, 25, 0)
+        cameras = FoVPerspectiveCameras(device=device, R=R, T=T,  fov =80)
 
         raster_settings = PointsRasterizationSettings(
             image_size=img_size, 
@@ -76,8 +76,8 @@ class ObjRenderer(nn.Module):
             bin_size=None
         )
 
-        R, T = look_at_view_transform(20, 10, 0)
-        cameras = FoVOrthographicCameras(device=device, R=R, T=T, znear=0.01)
+        R, T = look_at_view_transform(2.7, 25, 0)
+        cameras = FoVPerspectiveCameras(device=device, R=R, T=T,  fov =80)
         lights = PointLights(device=device, location=[[2.0, 2.0, 0.0]])
 
         self.renderer = MeshRenderer(
@@ -126,7 +126,7 @@ def visualise_point_cloud(points, img_loc, save_grid=True):
         images_to_grid(images.permute(0, 3,1,2), img_loc + '.png', nrow=4)
 
     else:
-        for i in images:
+        for i in range(len(images)):
             plt.imsave(img_loc + "_{:03d}.png".format(i), images[i].numpy())
 
 def visualise_mesh(mesh, img_loc, save_grid=True):
@@ -139,7 +139,7 @@ def visualise_mesh(mesh, img_loc, save_grid=True):
         images_to_grid(images.permute(0, 3,1,2), img_loc + '.png', nrow=4)
 
     else:
-        for i in images:
+        for i in range(len(images)):
             plt.imsave(img_loc + "_{:03d}.png".format(i), images[i].numpy())
 
 

@@ -11,7 +11,7 @@ from neural_network import MeshTransformer
 from pytorch3d.io import save_obj
 
 from dataset import MeshData
-from visualiser import visualise
+from visualiser import visualise_mesh
 
 
 def train(args):
@@ -47,12 +47,12 @@ def train(args):
             torch.save(model.state_dict(), f"{args['save_dir']}/models/model_{epoch}")
             sampled = flow.sample(args['samples'], scale=1)
 
-            visualise(sampled, f"{args['save_dir']}/images/epoch_{epoch}", args['save_grid'])
+            visualise_mesh(sampled, f"{args['save_dir']}/images/epoch_{epoch}", args['save_grid'])
 
 
     torch.save(model.state_dict(), f"{args['save_dir']}/models/model_final")
     sampled = flow.sample(args['samples'], scale=1).cpu().numpy()
-    visualise(sampled, f"{args['save_dir']}/images/final", args['save_grid'])
+    visualise_mesh(sampled, f"{args['save_dir']}/images/final", args['save_grid'])
 
 
 
