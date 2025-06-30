@@ -96,6 +96,8 @@ class ObjRenderer(nn.Module):
         verts = mesh.verts_padded()
         faces = mesh.faces_padded()
 
+        # print(verts.shape)
+
         verts_rgb = torch.ones_like(verts) 
         textures = TexturesVertex(verts_features=verts_rgb).to(self.device)
 
@@ -118,6 +120,7 @@ def render_obj(render, points, save_loc):
 
 
 def visualise_point_cloud(points, img_loc, save_grid=True):
+    points = points.copy()
     device = points.device
     renerer = PointCloudRenderer(device=device)
     images = renerer(points).cpu()
@@ -130,6 +133,7 @@ def visualise_point_cloud(points, img_loc, save_grid=True):
             plt.imsave(img_loc + "_{:03d}.png".format(i), images[i].numpy())
 
 def visualise_mesh(mesh, img_loc, save_grid=True):
+    mesh = mesh.clone()
     device = mesh.device
 
     renerer = ObjRenderer(device=device)

@@ -14,6 +14,8 @@ from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.structures import join_meshes_as_batch
 
 # These are pretty much identical, not great for dry code.
+dataclass_to_class = {'02691156': 0, '02747177': 1, '02773838': 2, '02801938': 3, '02808440': 4, '02818832': 5, '02828884': 6, '02843684': 7, '02871439': 8, '02876657': 9, '02880940': 10, '02924116': 11, '02933112': 12, '02942699': 13, '02946921': 14, '02954340': 15, '02958343': 16, '02992529': 17, '03001627': 18, '03046257': 19, '03085013': 20, '03207941': 21, '03211117': 22, '03261776': 23, '03325088': 24, '03337140': 25, '03467517': 26, '03513137': 27, '03593526': 28, '03624134': 29, '03636649': 30, '03642806': 31, '03691459': 32, '03710193': 33, '03759954': 34, '03761084': 35, '03790512': 36, '03797390': 37, '03928116': 38, '03938244': 39, '03948459': 40, '03991062': 41, '04004475': 42, '04074963': 43, '04090263': 44, '04099429': 45, '04225987': 46, '04256520': 47, '04330267': 48, '04379243': 49, '04401088': 50, '04460130': 51, '04468005': 52, '04530566': 53, '04554684': 54}
+
 
 class PointCloudData(Dataset):
     def __init__(self, data_dir, batch_size=4, num_workers=6, num_pts=5000, mode = 'train'):
@@ -27,7 +29,9 @@ class PointCloudData(Dataset):
         self.mode = mode
 
         self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/*.obj'))
-        self.classes = [i.replace('\\','/').split('/')[-4] for i in self.data_sequences]
+
+        self.classes = [dataclass_to_class[i.replace('\\','/').split('/')[-4]] for i in self.data_sequences]
+
     
     def __len__(self):
         return len(self.data_sequences)
@@ -72,7 +76,7 @@ class MeshData(Dataset):
         self.mode = mode
 
         self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/*.obj'))
-        self.classes = [i.replace('\\','/').split('/')[-4] for i in self.data_sequences]
+        self.classes = [dataclass_to_class[i.replace('\\','/').split('/')[-4]] for i in self.data_sequences]
     
     def __len__(self):
         return len(self.data_sequences)
@@ -99,7 +103,7 @@ class MeshData(Dataset):
 
         model = {
             'meshes': meshes,
-            'classes': [i['class'] for i in batch]
+            'classes': torch.tensor([int(i['class']) for i in batch])
         }
         return model
 
@@ -125,4 +129,4 @@ if __name__ == '__main__':
     data_loader = data_set.get_loader()
     item = next(iter(data_loader))
     print(type(item['meshes']))
-    print(type(item['classes']))
+    print(item['classes'])
