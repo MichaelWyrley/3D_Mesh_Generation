@@ -4,10 +4,8 @@
 # IDEA
 
 - Flow matching for 3D mesh generation
-- Generate noisy point cloud x and pull meshes from dataset y
-- Learn the mapping to turn each point in x to its corresponding point in y
-- Make sure to add a smoothness constraint to the genertion (e.g. local neighbourhood smoothness) in order to help generation
-
+- Generate a noisy sphere and transform it onto a 3D mesh by minimising Chamfer Distance 
+- We can learn this transformation using flow matching to generate new 3D meshes
 
 # Generating x
 
@@ -23,38 +21,50 @@
 
 # Training
 
-- We need to generate a curved path that the points in x take in order to get to the mesh y
-- 
-
-- If we choose option 2. we can trace the path the node took backwards for each timestep (might be nice)
-
-- If we choose option 1. or 3. we can push the node back towards its corresponding point in y using euclidian distance !!
-
-- It might be worth adding a smoothness constraint on a schedule (e.g. it becomes more important as time goes on)
+- Import Mesh from [ShapeNetCore](https://huggingface.co/datasets/ShapeNet/ShapeNetCore) 
 
 
 # TODO
 
-Create a mesh manipulation class based around the Mesh class from torch 3d
-    - The class must keep track of vertex, faces, vertex normals
-    - be able to manipulte the vertexs and update the faces and vertex normals
-    - work with neural networks
 
 [x] download shapnet, 
 [x] create class for shapenet input
 
-[ ] create neural network
-[ ] Add code for keeping smoothness constraint (Make sure the normal isn't to far from the previous normal!!!)
+[x] create neural network
+[x] Add code for keeping smoothness constraint (Make sure the normal isn't to far from the previous normal!!!)
 
-[ ] add generate x_0 code
-[ ] add learning loop, update flowMatching to allow for it to work
+[x] add generate x_0 code
+[x] add learning loop, update flowMatching to allow for it to work
 
 [x] add visualisation code
 
 
-- Torch 3d has padding built in so don't need to worry about masks (except for generation) !!
 
 
 # Install Requirments
 
+Install Torch 2.4.1
+
 In order to install torch3d visual studio build tools is required (version 19 (16.11.11) is what was used for this project which can be downloaded [here](https://learn.microsoft.com/en-us/visualstudio/releases/2019/history))
+
+# Acknowledgement
+
+```
+@article{ravi2020pytorch3d,
+    author = {Nikhila Ravi and Jeremy Reizenstein and David Novotny and Taylor Gordon
+                  and Wan-Yen Lo and Justin Johnson and Georgia Gkioxari},
+    title = {Accelerating 3D Deep Learning with PyTorch3D},
+    journal = {arXiv:2007.08501},
+    year = {2020},
+}
+```
+
+```
+@techreport{shapenet2015,
+  title       = {{ShapeNet: An Information-Rich 3D Model Repository}},
+  author      = {Chang, Angel X. and Funkhouser, Thomas and Guibas, Leonidas and Hanrahan, Pat and Huang, Qixing and Li, Zimo and Savarese, Silvio and Savva, Manolis and Song, Shuran and Su, Hao and Xiao, Jianxiong and Yi, Li and Yu, Fisher},
+  number      = {arXiv:1512.03012 [cs.GR]},
+  institution = {Stanford University --- Princeton University --- Toyota Technological Institute at Chicago},
+  year        = {2015}
+}
+```

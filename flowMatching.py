@@ -7,10 +7,10 @@ from pytorch3d.utils import ico_sphere
 from pytorch3d.structures import join_meshes_as_batch
 from pytorch3d.loss import (
     chamfer_distance, 
-    mesh_edge_loss, 
-    mesh_laplacian_smoothing, 
-    mesh_normal_consistency,
 )
+from losses import (mesh_edge_loss, 
+    mesh_laplacian_smoothing, 
+    mesh_normal_consistency,)
 from pytorch3d.structures import Meshes
 from tqdm.notebook import tqdm
 from pytorch3d.ops import sample_points_from_meshes
@@ -107,8 +107,8 @@ class FlowMatching():
     # simulate the path that the points travel on to move from x_0 to x_1 using chamfer distance optimisation!
     # Code modified from https://github.com/facebookresearch/pytorch3d/blob/main/docs/tutorials/deform_source_mesh_to_target_mesh.ipynb
     def simulate_path(self, x_0, x_1, t):
-        deform_verts = torch.full(x_0.verts_packed().shape, 0.0, device=self.device, requires_grad=True)
-        optimizer = torch.optim.SGD([deform_verts], lr=1.0, momentum=0.9)
+        deform_verts = [torch.full(i.verts_packed().shape, 0.0, device=self.device, requires_grad=True) for i in x_0]
+        optimizer = torch.optim.SGD(deform_verts, lr=self.simulation_lr, momentum=0.9)
 
 
         w_chamfer = 1.0 
@@ -117,14 +117,15 @@ class FlowMatching():
         w_laplacian = 0.1 
         
         max_iter = int(t.max())+1
-        simulation = [{'mesh': x_0.extend(1), 'vec': deform_verts.clone(), 'dist': 999999}]
+        simulation = [{'mesh': x_0.extend(1), 'vec': torch.cat(deform_verts, dim = 0).clone(), 'dist': torch.tensor([999999.,99999.,99999.])}]
 
         for i in range(max_iter):
             # print("simulation iteration: ", i)
             optimizer.zero_grad()
             
             # Deform the mesh
-            new_src_mesh = x_0.offset_verts(deform_verts)
+            new_src_mesh = x_0.offset_verts(torch.cat(deform_verts))
+
             sample_trg = sample_points_from_meshes(x_1, self.simulation_detail)
             sample_src = sample_points_from_meshes(new_src_mesh, self.simulation_detail)
 
@@ -135,35 +136,33 @@ class FlowMatching():
 
             # Weighted sum of the losses
             loss = loss_chamfer * w_chamfer + loss_edge * w_edge + loss_normal * w_normal + loss_laplacian * w_laplacian
+
+            simulation.append({'mesh': new_src_mesh.extend(1), 'vec': torch.stack(deform_verts, dim = 0).clone(), 'dist': loss_chamfer.clone()})
+
             loss = loss.mean()
-            simulation.append({'mesh': new_src_mesh.extend(1), 'vec': deform_verts.clone().unsqueeze(0), 'dist': loss_chamfer.clone().unsqueeze(0)})
-            
             # Optimization step
             loss.backward()
             optimizer.step()
 
-        # return simulation[t]
         return simulation
         
     
     def conditional_flow(self, x_0, x_1, t):
         amount_to_simulate = (self.simulation_iterations * t).ceil().int()
+        
+        simulation = self.simulate_path(x_0.clone(), x_1, amount_to_simulate)
 
-        simulation = None
-
+        idxes = {'mesh': [], 'vec': [], 'dist': []}
         for i in range(len(amount_to_simulate)):
-            i_amount_to_simulate = amount_to_simulate[i]
+            idxes['mesh'].append(simulation[amount_to_simulate[i]]['mesh'][i])
+            idxes['vec'].append(simulation[amount_to_simulate[i]]['vec'][i])
+            idxes['dist'].append(simulation[amount_to_simulate[i]]['dist'][i])
+        
+        idxes['mesh'] = join_meshes_as_batch(idxes['mesh'])
+        idxes['vec'] = torch.stack(idxes['vec'], dim = 0)
+        idxes['dist'] = torch.stack(idxes['dist'], dim = 0)
 
-            if simulation is None:
-                simulation = self.simulate_path(x_0[i].clone(), x_1[i], i_amount_to_simulate)[-1]
-            else:
-                simulation_i = self.simulate_path(x_0[i].clone(), x_1[i], i_amount_to_simulate)[-1]
-                simulation['mesh'] = join_meshes_as_batch([simulation['mesh'], simulation_i['mesh']])
-                simulation['vec']  = torch.cat((simulation['vec'], simulation_i['vec']), dim = 0)
-                simulation['dist'] = torch.cat((simulation['dist'], simulation_i['dist']), dim = 0)
-
-        return simulation
-
+        return idxes
     
     def conditional_vector_field(self, x_0, x_t, x_1, epsilon=0.00001):
         sample_x_1 = sample_points_from_meshes(x_1, self.simulation_detail)
@@ -174,15 +173,12 @@ class FlowMatching():
         d_0_1, _ = chamfer_distance(sample_x_0, sample_x_1, batch_reduction=None)
         grad_d_t_1 = x_t['vec']
 
-        # print(d_0_1.shape, grad_d_t_1.shape, ((torch.linalg.norm(grad_d_t_1, dim=(2))+epsilon).unsqueeze(-1)).shape)
-
         out = d_0_1[:,None,None] * grad_d_t_1 / ((torch.linalg.norm(grad_d_t_1, dim=(2))+epsilon).unsqueeze(-1))
 
         if (out.isnan().any()):
             out = torch.nan_to_num(out, nan=0.0)
 
         return out
-        # return (x_1 - (1 - self.sigma_small) * x_0)
 
     def apply_nn(self, x, t, c = None):
 
@@ -203,16 +199,10 @@ class FlowMatching():
 
         con_vec = self.conditional_vector_field(x_0, psi_t, x_1)
 
-        # print(con_vec.shape, v_t.shape)
-
         loss = F.mse_loss(v_t, con_vec)
 
         return loss
     
-    # def offset_verts(self, mesh, offset):
-    #     for i in range(len(mesh)):
-    #         mesh[i].offset_verts(offset[i])
-        
     
     def sample(self, n, timesteps=50, scale=1, labels=None):
         self.model.eval()
@@ -292,7 +282,7 @@ def test_main_multiple_meshes():
     save_dir = './outputs/images/test'
 
     neural_net = DiT_adaLN_zero(in_dim=3, depth=2, emb_dimention=18, num_heads=3, num_classes=55, device = device, condition_prob=1.0)
-    model = FlowMatching(neural_net, device = device, simulation_iterations=300, simulation_lr=15.0, simulation_detail = 5000, sphere_detail=4, x_0_purtubation_amount=20, x_0_purtubation_power=0.01)
+    model = FlowMatching(neural_net, device = device, simulation_iterations=300, simulation_lr=12, simulation_detail = 7500, sphere_detail=4, x_0_purtubation_amount=20, x_0_purtubation_power=0.01)
 
     data_set = MeshData(data_dir = "../ShapeNetCore", batch_size=4)
     data_loader = data_set.get_loader()
@@ -302,31 +292,27 @@ def test_main_multiple_meshes():
     x_1_class = item['classes'].to(device)
     x_0 = model.generate_x_0(x_1)
 
-    # visualise_mesh(x_1,save_dir + '_base_x1_mesh')
-    # visualise_mesh(x_0,save_dir + '_base_x0_mesh')
+    visualise_mesh(x_1,save_dir + '_base_x1_mesh')
+    visualise_mesh(x_0,save_dir + '_base_x0_mesh')
 
     # t = model.sample_timestep(x_1.verts_padded().shape[0])
     t = torch.ones(x_1.verts_padded().shape[0], device = device).unsqueeze(-1)
     amount_to_simulate = (model.simulation_iterations * t).ceil().int()
 
     psi_t = model.conditional_flow(x_0, x_1, t)
-    # visualise_mesh(psi_t['mesh'],save_dir + '_psi_t')
+    visualise_mesh(psi_t['mesh'],save_dir + '_psi_t')
 
     # simulation = []
-
-    # for k in range(len(amount_to_simulate)):
-    #     i_amount_to_simulate = amount_to_simulate[k]
-    #     simulation.append(model.simulate_path(x_0[k].clone(), x_1[k], i_amount_to_simulate))
+    
+    import time
+    start = time.time()
+    print("start")
+    simulated_path = model.simulate_path(x_0, x_1, amount_to_simulate)
+    print("end, {:.3f}".format(time.time() - start))
 
     # print(amount_to_simulate[0], ", ", len(simulation))
-    # for i in range(0,amount_to_simulate[0], 10):
-    #     meshes = []
-    #     for k in range(len(simulation)):
-    #         meshes.append(simulation[k][i]['mesh'])
-        
-    #     visualise_mesh(join_meshes_as_batch(meshes), "./outputs/images/simulation/{:03d}".format(i))
-    
-    # print(x_1.verts_padded().shape, psi_t['mesh'].verts_padded().shape, psi_t['mesh'].verts_padded().device)
+    for i in range(0,amount_to_simulate[0], 10):
+        visualise_mesh(simulated_path[i]['mesh'], "./outputs/images/simulation/{:03d}".format(i))
     
     v_t = model.apply_nn(psi_t['mesh'], t, x_1_class)
 
