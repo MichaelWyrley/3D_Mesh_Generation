@@ -37,7 +37,7 @@ class PointCloudData(Dataset):
         return len(self.data_sequences)
 
     def __getitem__(self, idx):
-        verts, faces, _ = load_obj(self.data_sequences[idx])
+        verts, faces, _ = load_obj(self.data_sequences[idx], load_textures=True)
 
         center = verts.mean(0)
         verts = verts - center
@@ -82,7 +82,13 @@ class MeshData(Dataset):
         return len(self.data_sequences)
 
     def __getitem__(self, idx):
-        verts, faces, _ = load_obj(self.data_sequences[idx])
+        
+        # print("Loaded: id: ", idx, " : ", self.data_sequences[idx])
+        try:
+            verts, faces, _ = load_obj(self.data_sequences[idx], load_textures=True)
+        except:
+            print("Error Occured when loading model with id:", idx, ", path: ",self.data_sequences[idx])
+            verts, faces, _ = load_obj(self.data_sequences[0],load_textures=False)
 
         center = verts.mean(0)
         verts = verts - center

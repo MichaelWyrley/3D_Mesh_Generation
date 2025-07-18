@@ -18,7 +18,7 @@ from math import ceil
 
 class FlowMatching():
 
-    def __init__(self, model, training_type=3, device='cuda', simulation_iterations=300, simulation_lr=15.0, simulation_detail = 5000, sphere_detail=4, x_0_purtubation_amount=20, x_0_purtubation_power=0.01):
+    def __init__(self, model, training_type=3, device='cuda', simulation_iterations=150, simulation_lr=15.0, simulation_detail = 5000, sphere_detail=4, x_0_purtubation_amount=20, x_0_purtubation_power=0.01):
         """
         :param model: the neural network used for vector field predictions
         :param device: the torch device it will be run on

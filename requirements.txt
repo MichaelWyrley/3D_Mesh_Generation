@@ -2,6 +2,6 @@ git+https://github.com/facebookresearch/pytorch3d.git
 
 
 matplotlib
-opencv
+opencv-python
 numpy
-
+tqdm
