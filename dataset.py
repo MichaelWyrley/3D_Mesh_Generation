@@ -8,7 +8,7 @@ import torch
 import glob
 
 from torch.utils.data import Dataset
-from pytorch3d.io import load_obj, save_obj
+from pytorch3d.io import load_ply, save_obj
 from pytorch3d.structures import Meshes
 from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.structures import join_meshes_as_batch
@@ -28,7 +28,7 @@ class PointCloudData(Dataset):
         # Implement train / test split !!
         self.mode = mode
 
-        self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/*.obj'))
+        self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/*.ply'))
 
         self.classes = [dataclass_to_class[i.replace('\\','/').split('/')[-4]] for i in self.data_sequences]
 
@@ -37,14 +37,14 @@ class PointCloudData(Dataset):
         return len(self.data_sequences)
 
     def __getitem__(self, idx):
-        verts, faces, _ = load_obj(self.data_sequences[idx], load_textures=True)
+        verts, faces = load_ply(self.data_sequences[idx])
 
         center = verts.mean(0)
         verts = verts - center
         scale = max(verts.abs().max(0)[0])
         verts = verts / scale
 
-        mesh = Meshes(verts=[verts], faces=[faces.verts_idx])
+        mesh = Meshes(verts=[verts], faces=[faces])
 
         sub_sample_mesh = sample_points_from_meshes(mesh, self.num_pts)
 
@@ -75,7 +75,7 @@ class MeshData(Dataset):
         # Implement train / test split !!
         self.mode = mode
 
-        self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/*.obj'))
+        self.data_sequences = sorted(glob.glob(self.data_dir + '/*/*/*/simplified_mesh.ply'))
         self.classes = [dataclass_to_class[i.replace('\\','/').split('/')[-4]] for i in self.data_sequences]
     
     def __len__(self):
@@ -85,17 +85,17 @@ class MeshData(Dataset):
         
         # print("Loaded: id: ", idx, " : ", self.data_sequences[idx])
         try:
-            verts, faces, _ = load_obj(self.data_sequences[idx], load_textures=True)
+            verts, faces = load_ply(self.data_sequences[idx])
         except:
             print("Error Occured when loading model with id:", idx, ", path: ",self.data_sequences[idx])
-            verts, faces, _ = load_obj(self.data_sequences[0],load_textures=False)
+            verts, faces = load_ply(self.data_sequences[0])
 
         center = verts.mean(0)
         verts = verts - center
         scale = max(verts.abs().max(0)[0])
         verts = verts / scale
 
-        mesh = Meshes(verts=[verts], faces=[faces.verts_idx])
+        mesh = Meshes(verts=[verts], faces=[faces])
         model = {
             'mesh': mesh,
             'class': self.classes[idx]
@@ -134,5 +134,5 @@ if __name__ == '__main__':
     data_set = MeshData(data_dir = "../ShapeNetCore", batch_size=3)
     data_loader = data_set.get_loader()
     item = next(iter(data_loader))
-    print(type(item['meshes']))
+    print(item['meshes'].verts_packed().shape)
     print(item['classes'])

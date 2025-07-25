@@ -72,7 +72,7 @@ if __name__ == '__main__':
         'save_dir': 'outputs',
 
         'batch_size': 7,
-        'simulation_detail': 5000,
+        'simulation_detail': 1500,
         'lr': 1e-4,
         'epochs': 400,
         'sphere_detail': 1,
